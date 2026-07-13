@@ -8,13 +8,14 @@
 
 - **双协议支持** — 浏览器 HTTP 访问 + 专用 TCP 客户端，兼顾便捷与性能
 - **流式压缩下载** — 浏览器端实时 streaming zip，不落临时文件，大文件夹无内存压力
-- **零拷贝传输** — 客户端 TCP 通道使用大缓冲 I/O，千兆局域网可达 100+ MB/s
+- **分块流式传输** — 所有文件统一 4MB 分块 + sync.Pool 缓冲区复用，支持超大文件夹（40GB+）
 - **zstd 压缩** — 自动跳过视频/图片/压缩包等不可压缩格式，节省带宽
-- **目录子文件递归** — 自动保留完整目录结构及子文件
-- **并发传输** — 多文件并行下载，可配置并发数
+- **目录递归遍历** — 自动保留完整目录结构及子文件
+- **并发传输** — 多文件并行下载，goroutine 信号量限流，可配置并发数
 - **终端进度条** — 实时显示传输速度、进度百分比、剩余时间
 - **单文件分发** — 一个 exe + 命令行参数即可运行，无需配置文件
-- **增量跳过** — 根据文件大小和修改时间自动跳过已存在且一致的文件
+- **增量跳过** — 根据文件大小和修改时间自动跳过已存在且一致的文件（1 秒容差兼容 FAT/exFAT）
+- **崩溃可观测** — panic recovery + stack trace 日志，异常不再静默退出
 
 ## 快速开始
 
@@ -23,20 +24,24 @@
 在存放文件的电脑上运行：
 
 ```powershell
+# 指定目录
 .\gosync-server.exe --root D:\data --root E:\work
+
+# 或使用当前目录（不指定 --root）
+.\gosync-server.exe
 ```
 
 ```
+未指定 --root，默认使用当前目录: C:\Users\attem\share
 ========================================
   GoSync Server
 ========================================
-  HTTP:     http://:18080
-  TCP:      tcp://:19090
-  根目录:   D:\data, E:\work
-  并发数:   8
-  分块大小: 4 MB
-  大文件阈值: 16 MB
-  压缩:     true (level 3)
+  HTTP:      http://:18080
+  TCP:       tcp://:19090
+  根目录:    C:\Users\attem\share
+  并发数:    8
+  分块大小:  4 MB
+  压缩:      true (level 3)
 ========================================
 服务已启动，按 Ctrl+C 停止
 ```
@@ -89,7 +94,7 @@ LAN 局域网
   │  └─────────────┬────────────────┘  │
   │  ┌─────────────┴────────────────┐  │
   │  │      Transfer Engine         │  │
-  │  │  (零拷贝/分块并行/zstd压缩)   │  │
+  │  │  (分块流式/并发传输/zstd压缩)   │  │
   │  └─────────────┬────────────────┘  │
   │  ┌─────────────┴────────────────┐  │
   │  │  HTTP Handler │ TCP Handler  │  │
@@ -115,17 +120,18 @@ TCP 协议帧格式：
 
 ### 服务端 `gosync-server.exe`
 
-| 参数                  | 默认值           | 说明                                              |
-| --------------------- | ---------------- | ------------------------------------------------- |
-| `--root`            | 必填，可多次指定 | 允许访问的目录                                    |
-| `--http`            | `:18080`       | HTTP 监听地址                                     |
-| `--tcp`             | `:19090`       | TCP 监听地址                                      |
-| `--concurrency`     | `8`            | 并行传输文件数                                    |
-| `--chunk-size`      | `4`            | 分块大小 (MB)                                     |
-| `--large-threshold` | `16`           | 大文件阈值 (MB)，超过此大小的文件启用分块流式传输 |
-| `--compress`        | `true`         | 启用 zstd 压缩                                    |
-| `--compress-level`  | `3`            | zstd 压缩级别 (1=最快, 22=最优)                   |
-| `--rate-limit`      | `0`            | 限速 (MB/s)，0=不限速                             |
+| 参数 | 短参数 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--root` | `-r` | 当前目录 | 允许访问的根目录，可多次指定 |
+| `--http` | `-H` | `:18080` | HTTP 监听地址 |
+| `--tcp` | `-T` | `:19090` | TCP 监听地址 |
+| `--concurrency` | `-n` | `8` | 并行传输文件数 |
+| `--chunk-size` | `-k` | `4` | 分块大小 (MB) |
+| `--compress` | — | 默认启用 | 启用 zstd 压缩 |
+| `--no-compress` | — | — | 禁用 zstd 压缩 |
+| `--compress-level` | `-z` | `3` | zstd 压缩级别 (1=最快, 22=最优) |
+| `--rate-limit` | `-R` | `0` | 限速 (MB/s)，0=不限速 |
+| `--help` | `-h` | — | 显示帮助 |
 
 ### 客户端 `gosync-client.exe`
 
@@ -134,22 +140,22 @@ gosync-client pull <主机IP> <远程路径> [flags]
 gosync-client list <主机IP> <远程路径> [flags]
 ```
 
-| 参数                      | 默认值    | 说明         |
-| ------------------------- | --------- | ------------ |
-| `--output`, `-o`      | 当前目录  | 本地输出目录 |
-| `--port`, `-p`        | `19090` | TCP 端口     |
-| `--concurrency`, `-c` | `8`     | 并行下载数   |
+| 参数 | 短参数 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--output` | `-o` | 远程路径名 | 本地输出目录（默认取远程路径最后一段） |
+| `--port` | `-p` | `19090` | TCP 端口 |
+| `--concurrency` | `-c` | `8` | 并行下载数 |
 
 ## 性能策略
 
-| 场景            | 策略                                                |
-| --------------- | --------------------------------------------------- |
-| 大文件 (>16MB)  | 分块流式传输，每块 4MB，避免一次性读入内存          |
-| 小文件 (≤16MB) | 一次性读入内存，单 chunk 发送                       |
-| 并发控制        | goroutine 信号量限流，默认 8 路并发                 |
-| 压缩            | zstd level 3，自动跳过视频/图片/ZIP/JPEG/PNG/MP4 等 |
-| 连接复用        | TCP 长连接，多文件复用                              |
-| 套接字调优      | TCP_NODELAY + 1MB 读写缓冲区                        |
+| 策略 | 说明 |
+| --- | --- |
+| 统一分块流式 | 所有文件统一 4MB 分块读取，不按大小区分路径，`sync.Pool` 复用缓冲区 |
+| 并发控制 | goroutine 信号量限流，默认 8 路并发 |
+| zstd 压缩 | level 3，自动跳过 .zip/.jpg/.jpeg/.png/.mp4/.mkv/.avi 等已压缩格式 |
+| 连接复用 | TCP 长连接，多文件复用同一连接 |
+| TCP 调优 | TCP_NODELAY + 1MB Read/Write Buffer |
+| Panic 防护 | HTTP handler + TCP session 双重 panic recovery，异常带 stack trace |
 
 ## 增量下载
 
@@ -162,18 +168,27 @@ gosync-client list <主机IP> <远程路径> [flags]
 
 ## 编译
 
+**快捷脚本：**
+
+```powershell
+.\build.ps1   # PowerShell
+build.bat     # CMD
+```
+
+**手动编译：**
+
 ```powershell
 # 安装依赖
 go mod tidy
 
 # 编译服务端
-go build -o gosync-server.exe ./cmd/server/
+go build -ldflags="-s -w" -o gosync-server.exe ./cmd/server/
 
 # 编译客户端
-go build -o gosync-client.exe ./cmd/client/
+go build -ldflags="-s -w" -o gosync-client.exe ./cmd/client/
 ```
 
-要求 Go 1.22+。
+脚本会先运行 `go vet` 检查代码，然后编译两个 exe（`-ldflags="-s -w"` 去除调试信息精简体积），并显示文件大小。要求 Go 1.22+。
 
 ## 技术栈
 
@@ -190,7 +205,7 @@ go build -o gosync-client.exe ./cmd/client/
 - 仅支持**单向下载**（Server → Client），不支持双向同步
 - 完全信任局域网环境，无认证/加密
 - 端口默认 18080/19090，可通过命令行调整以避免冲突
-- 目前仅在 Windows 上编译和测试，Linux 支持需替换 `sendfile_windows.go` 中的实现
+- 目前仅在 Windows 上编译和测试，Linux/macOS 需替换 `sendfile_windows.go` 中的平台相关实现
 
 ## License
 

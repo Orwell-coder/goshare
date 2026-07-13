@@ -104,6 +104,40 @@ func FileCount(files []*proto.FileInfo) int {
 	return n
 }
 
+// WalkShallow reads only the direct children of root (depth 1), no recursion.
+// Directories are sorted before files, then alphabetically by name.
+func WalkShallow(root string) ([]*proto.FileInfo, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]*proto.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		fi := &proto.FileInfo{
+			Path:    filepath.ToSlash(entry.Name()),
+			Size:    info.Size(),
+			ModTime: info.ModTime().UnixNano(),
+			IsDir:   entry.IsDir(),
+		}
+		files = append(files, fi)
+	}
+
+	// Sort: directories first, then alphabetically
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].IsDir != files[j].IsDir {
+			return files[i].IsDir
+		}
+		return files[i].Path < files[j].Path
+	})
+
+	return files, nil
+}
+
 // TotalSize returns the total size of all regular files.
 func TotalSize(files []*proto.FileInfo) int64 {
 	var total int64

@@ -43,7 +43,7 @@ func Pull(opts PullOptions) error {
 
 	// Request file listing
 	fmt.Printf("获取目录列表: %s\n", opts.RemotePath)
-	resp, err := conn.List(opts.RemotePath)
+	resp, err := conn.List(opts.RemotePath, 0)
 	if err != nil {
 		return fmt.Errorf("获取目录列表失败: %w", err)
 	}
@@ -124,7 +124,7 @@ func ListRemote(host string, port int, remotePath string) error {
 	}
 	defer conn.Close()
 
-	resp, err := conn.List(remotePath)
+	resp, err := conn.List(remotePath, 1)
 	if err != nil {
 		return fmt.Errorf("获取列表失败: %w", err)
 	}

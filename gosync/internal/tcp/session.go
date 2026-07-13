@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gosync/internal/filesvc"
 	"gosync/internal/proto"
 	"gosync/internal/transfer"
 )
@@ -18,6 +19,7 @@ type Session struct {
 	dec      *proto.Decoder
 	engine   *transfer.Engine
 	rootDirs []string
+	listRoot string // resolved root from most recent ListRequest
 }
 
 // NewSession creates a session for a client connection.
@@ -73,7 +75,15 @@ func (s *Session) handleList(req *proto.ListRequest) error {
 		})
 	}
 
-	files, err := s.engine.WalkDir(root)
+	s.listRoot = root
+
+	var files []*proto.FileInfo
+	var err error
+	if req.MaxDepth >= 1 {
+		files, err = filesvc.WalkShallow(root)
+	} else {
+		files, err = s.engine.WalkDir(root)
+	}
 	if err != nil {
 		return s.enc.Encode(&proto.ErrorMessage{
 			Code:    500,
@@ -111,7 +121,10 @@ func (s *Session) handleDownload(req *proto.DownloadReq) error {
 			continue
 		}
 
-		rootDir := s.findRootDir(absPath)
+		rootDir := s.listRoot
+		if rootDir == "" {
+			rootDir = s.findRootDir(absPath)
+		}
 
 		sender := transfer.NewChunkSender(
 			rootDir,
@@ -164,9 +177,21 @@ func (s *Session) resolveRoot(requestPath string) string {
 }
 
 // resolveFilePath resolves a relative file path against all root directories.
+// When a list root has been set (from a prior ListRequest on this session),
+// it is searched first — this is necessary for sub-directory listings whose
+// file paths are relative to the requested sub-directory, not the server root.
 func (s *Session) resolveFilePath(relPath string) string {
 	cleanPath := filepath.FromSlash(strings.Trim(relPath, "/"))
 
+	// First, try the list root (sub-directory context from the most recent list).
+	if s.listRoot != "" {
+		candidate := filepath.Join(s.listRoot, cleanPath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// Fall back to searching all configured root directories.
 	for _, root := range s.rootDirs {
 		candidate := filepath.Join(root, cleanPath)
 		if _, err := os.Stat(candidate); err == nil {

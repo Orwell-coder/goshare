@@ -45,8 +45,9 @@ func (c *Conn) Close() error {
 }
 
 // List requests the file tree from the server for a given path.
-func (c *Conn) List(path string) (*proto.ListResponse, error) {
-	if err := c.enc.Encode(&proto.ListRequest{Path: path}); err != nil {
+// maxDepth controls recursion: 0 = unlimited, 1 = direct children only.
+func (c *Conn) List(path string, maxDepth int) (*proto.ListResponse, error) {
+	if err := c.enc.Encode(&proto.ListRequest{Path: path, MaxDepth: maxDepth}); err != nil {
 		return nil, fmt.Errorf("发送列表请求失败: %w", err)
 	}
 

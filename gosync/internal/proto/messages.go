@@ -22,8 +22,11 @@ type FileInfo struct {
 }
 
 // ListRequest asks the server for the file tree under a given path.
+// MaxDepth controls recursion depth: 0 = unlimited (default, current behavior),
+// 1 = only direct children (shallow listing).
 type ListRequest struct {
-	Path string
+	Path     string
+	MaxDepth int
 }
 
 // ListResponse returns the file tree.
