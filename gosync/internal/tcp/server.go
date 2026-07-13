@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"runtime/debug"
 	"time"
 
 	"gosync/internal/proto"
@@ -74,12 +75,21 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[tcp] PANIC in session from %s: %v\n%s",
+				conn.RemoteAddr(), r, string(debug.Stack()))
+		}
+	}()
+
 	enc := proto.NewEncoder(conn)
 	dec := proto.NewDecoder(conn)
 
 	session := NewSession(enc, dec, s.engine, s.rootDirs)
 	if err := session.Handle(ctx); err != nil {
-		log.Printf("[tcp] session ended: %v", err)
+		if !isEOF(err) {
+			log.Printf("[tcp] session ended: %v", err)
+		}
 	}
 }
 

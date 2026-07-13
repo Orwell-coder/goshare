@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/debug"
 )
 
 // Server serves the HTTP interface for browser access.
@@ -23,8 +24,7 @@ func NewServer(rootDirs []string) *Server {
 	mux.HandleFunc("/download", handleDownload(rootDirs))
 
 	s.srv = &http.Server{
-		Handler:      mux,
-		ConnContext:  saveConnInContext,
+		Handler:      recoveryMiddleware(mux),
 		ReadTimeout:  0, // streaming downloads have no timeout
 		WriteTimeout: 0,
 		IdleTimeout:  0,
@@ -53,7 +53,16 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 	return err
 }
 
-// saveConnInContext is a no-op adapter for compatibility.
-func saveConnInContext(ctx context.Context, c net.Conn) context.Context {
-	return ctx
+// recoveryMiddleware catches panics in HTTP handlers and logs them.
+func recoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("[http] PANIC in %s %s: %v\n%s",
+					r.Method, r.URL.Path, rec, string(debug.Stack()))
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }

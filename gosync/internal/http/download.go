@@ -12,6 +12,7 @@ import (
 )
 
 // handleDownload streams a directory as a zip file to the HTTP response.
+// URL format: /download?path=/<rootName>/<subpath...>
 func handleDownload(rootDirs []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pathParam := r.URL.Query().Get("path")
@@ -20,34 +21,39 @@ func handleDownload(rootDirs []string) http.HandlerFunc {
 			return
 		}
 
-		relPath := strings.TrimPrefix(pathParam, "/")
-		cleanPath := filepath.FromSlash(relPath)
+		relPath := strings.Trim(pathParam, "/")
 
-		// Resolve the target directory across all root dirs
+		// Path format: <rootName>/<subpath...>
+		parts := strings.SplitN(relPath, "/", 2)
+		rootName := parts[0]
+		subPath := ""
+		if len(parts) > 1 {
+			subPath = parts[1]
+		}
+
+		// Find the root by name and resolve subpath
 		var targetDir string
 		for _, root := range rootDirs {
-			candidate := filepath.Join(root, cleanPath)
-			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-				targetDir = candidate
-				break
+			if filepath.Base(root) != rootName {
+				continue
 			}
-			// Try as a root name
-			if filepath.Base(root) == cleanPath {
+			if subPath == "" {
 				targetDir = root
-				break
+			} else {
+				candidate := filepath.Join(root, filepath.FromSlash(subPath))
+				if info, err := os.Stat(candidate); err == nil {
+					if info.IsDir() {
+						targetDir = candidate
+					} else {
+						serveFile(w, r, candidate)
+						return
+					}
+				}
 			}
+			break
 		}
 
 		if targetDir == "" {
-			// Try as a file
-			for _, root := range rootDirs {
-				candidate := filepath.Join(root, cleanPath)
-				if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-					// Single file download
-					serveFile(w, r, candidate)
-					return
-				}
-			}
 			http.NotFound(w, r)
 			return
 		}
@@ -71,11 +77,9 @@ func handleDownload(rootDirs []string) http.HandlerFunc {
 				return nil
 			}
 
-			// Relative path within the zip
 			zipPath := strings.TrimPrefix(path, prefix)
 			zipPath = filepath.ToSlash(zipPath)
 
-			// Create zip header
 			header, err := zip.FileInfoHeader(info)
 			if err != nil {
 				return err

@@ -1,81 +1,87 @@
 package transfer
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"gosync/internal/proto"
 )
 
-// ChunkSize is the default size of data chunks sent over TCP.
-// 4MB balances throughput vs memory per connection.
-const DefaultChunkSize = 4 * 1024 * 1024 // 4MB
+// DefaultChunkSize is the default size of data chunks sent over TCP (4MB).
+const DefaultChunkSize = 4 * 1024 * 1024
 
-// LargeFileThreshold: files above this size use chunked sendfile.
-const DefaultLargeFileThreshold = 16 * 1024 * 1024 // 16MB
-
-// ChunkSender manages chunked file transmission over a proto.Encoder.
+// ChunkSender streams files to a proto.Encoder in fixed-size chunks.
+// All files, regardless of size, are streamed — no full-file reads into memory.
 type ChunkSender struct {
-	chunkSize       int
-	largeThreshold  int64
-	rootDir         string
+	chunkSize int
+	rootDir   string
+}
+
+// Buffer pool to reuse chunk buffers and avoid GC pressure during large transfers.
+var chunkBufPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, DefaultChunkSize)
+	},
 }
 
 // NewChunkSender creates a ChunkSender.
-func NewChunkSender(rootDir string, chunkSize int, largeSizeThreshold int64) *ChunkSender {
+func NewChunkSender(rootDir string, chunkSize int, _ int64) *ChunkSender {
 	if chunkSize <= 0 {
 		chunkSize = DefaultChunkSize
 	}
-	if largeSizeThreshold <= 0 {
-		largeSizeThreshold = DefaultLargeFileThreshold
-	}
 	return &ChunkSender{
-		chunkSize:      chunkSize,
-		largeThreshold: largeSizeThreshold,
-		rootDir:        rootDir,
+		chunkSize: chunkSize,
+		rootDir:   rootDir,
 	}
 }
 
-// SendFile transmits a single file in chunks. For files smaller than the large
-// threshold, it reads the entire file and sends as one chunk. For large files,
-// it streams in chunkSize blocks from disk.
-func (s *ChunkSender) SendFile(enc *proto.Encoder, fi *proto.FileInfo) error {
+// SendFile streams a single file to the encoder in chunks.
+// Every file is streamed, never fully loaded into memory.
+func (s *ChunkSender) SendFile(enc *proto.Encoder, fi *proto.FileInfo) (err error) {
 	absPath := filepath.Join(s.rootDir, filepath.FromSlash(fi.Path))
 
-	f, err := os.Open(absPath)
-	if err != nil {
-		return err
+	f, openErr := os.Open(absPath)
+	if openErr != nil {
+		return fmt.Errorf("open %s: %w", fi.Path, openErr)
 	}
-	defer f.Close()
-
-	if fi.Size < s.largeThreshold {
-		// Small file: read all at once
-		data := make([]byte, fi.Size)
-		if _, err := f.Read(data); err != nil {
-			return err
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = closeErr
 		}
-		return enc.WriteChunk(fi.Path, 0, data, true)
+	}()
+
+	buf := chunkBufPool.Get().([]byte)
+	defer chunkBufPool.Put(buf)
+
+	// Ensure buffer is at least chunkSize
+	if cap(buf) < s.chunkSize {
+		buf = make([]byte, s.chunkSize)
 	}
 
-	// Large file: stream in chunks
-	buf := make([]byte, s.chunkSize)
 	var offset int64
 	for offset < fi.Size {
 		toRead := int64(len(buf))
 		if remaining := fi.Size - offset; remaining < toRead {
 			toRead = remaining
-			buf = buf[:toRead]
 		}
-		n, err := f.ReadAt(buf[:toRead], offset)
-		if err != nil && err != os.ErrClosed {
-			return err
+		if int(toRead) > cap(buf) {
+			toRead = int64(cap(buf))
+		}
+
+		n, readErr := f.ReadAt(buf[:toRead], offset)
+		if readErr != nil && readErr != io.EOF {
+			return fmt.Errorf("read %s at %d: %w", fi.Path, offset, readErr)
 		}
 		if n == 0 {
 			break
 		}
+
 		isLast := offset+int64(n) >= fi.Size
-		if err := enc.WriteChunk(fi.Path, offset, buf[:n], isLast); err != nil {
-			return err
+		if writeErr := enc.WriteChunk(fi.Path, offset, buf[:n], isLast); writeErr != nil {
+			return fmt.Errorf("write chunk %s at %d: %w", fi.Path, offset, writeErr)
 		}
 		offset += int64(n)
 	}
@@ -95,19 +101,17 @@ func (s *ChunkSender) SendBatch(enc *proto.Encoder, files []*proto.FileInfo) err
 	return nil
 }
 
-// WriteFile writes received chunk data to a local file.
+// WriteFileChunk writes received chunk data to a local file.
 // Creates parent directories as needed.
 func WriteFileChunk(baseDir string, chunk *proto.DataChunk) error {
 	localPath := filepath.Join(baseDir, filepath.FromSlash(chunk.Path))
 
-	// Create parent directories on first chunk
 	if chunk.Offset == 0 {
 		if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
 			return err
 		}
 	}
 
-	// Open file for writing at the correct offset
 	flag := os.O_CREATE | os.O_WRONLY
 	if chunk.Offset == 0 {
 		flag |= os.O_TRUNC

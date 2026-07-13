@@ -26,7 +26,7 @@ func DefaultConfig() Config {
 	return Config{
 		Concurrency:    8,
 		ChunkSize:      DefaultChunkSize,
-		LargeThreshold: DefaultLargeFileThreshold,
+		LargeThreshold: 0, // deprecated: all files now stream in chunks
 		Compression:    true,
 		CompressLevel:  3,
 		RateLimitMBs:   0,
@@ -54,8 +54,18 @@ func (e *Engine) Config() Config { return e.cfg }
 func (e *Engine) Compressor() *Compressor { return e.compressor }
 
 // WalkDir returns the file listing for a directory tree.
+// Uses plain Walk (no SHA256) to avoid reading all file data on listing,
+// which would be fatal for large (40GB+) directories.
 func (e *Engine) WalkDir(root string) ([]*proto.FileInfo, error) {
-	return filesvc.WalkConcurrent(root, e.cfg.Concurrency)
+	files, err := filesvc.Walk(root)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("walk: %d files (%d dirs), %s total",
+		filesvc.FileCount(files),
+		len(files)-filesvc.FileCount(files),
+		formatBytes(filesvc.TotalSize(files)))
+	return files, nil
 }
 
 // TransferResult holds the outcome of a transfer.

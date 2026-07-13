@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"gosync/pkg/client"
@@ -76,12 +77,16 @@ func pullCmd() {
 		}
 	}
 
-	output := "."
+	output := ""
 	if v, ok := opts["output"]; ok {
 		output = v
 	}
 	if v, ok := opts["o"]; ok {
 		output = v
+	}
+	if output == "" {
+		// Default: use the basename of the remote path
+		output = filepath.Base(filepath.FromSlash(positional[1]))
 	}
 
 	concurrency := 8

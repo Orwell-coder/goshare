@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -40,7 +41,9 @@ func (s *Session) Handle(ctx context.Context) error {
 
 		mt, msg, err := s.dec.Decode()
 		if err != nil {
-			log.Printf("[tcp] decode error: %v", err)
+			if !isEOF(err) {
+				log.Printf("[tcp] decode error: %v", err)
+			}
 			return err
 		}
 
@@ -95,7 +98,6 @@ func (s *Session) handleDownload(req *proto.DownloadReq) error {
 			continue
 		}
 
-		// Get file info for chunked sending
 		fi, err := os.Stat(absPath)
 		if err != nil {
 			s.enc.Encode(&proto.ErrorMessage{
@@ -106,11 +108,9 @@ func (s *Session) handleDownload(req *proto.DownloadReq) error {
 		}
 
 		if fi.IsDir() {
-			// Skip directories in download requests
 			continue
 		}
 
-		// Determine the root dir this file belongs to
 		rootDir := s.findRootDir(absPath)
 
 		sender := transfer.NewChunkSender(
@@ -134,7 +134,6 @@ func (s *Session) handleDownload(req *proto.DownloadReq) error {
 			continue
 		}
 
-		// Signal completion for this file
 		if err := s.enc.Encode(&proto.BatchDone{Path: relPath}); err != nil {
 			return err
 		}
@@ -146,22 +145,16 @@ func (s *Session) handleDownload(req *proto.DownloadReq) error {
 // resolveRoot resolves a client-requested path (e.g. "/testdata" or "/data/movies")
 // to an absolute directory path within the configured root directories.
 func (s *Session) resolveRoot(requestPath string) string {
-	// Normalize: remove leading/trailing slashes, convert to OS path separators
 	relPath := filepath.FromSlash(strings.Trim(requestPath, "/"))
-
-	// Empty path or "." means show all roots (return first root)
 	if relPath == "" || relPath == "." {
 		return s.rootDirs[0]
 	}
 
 	for _, root := range s.rootDirs {
-		// Try joining root + relative path
 		candidate := filepath.Join(root, relPath)
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			return candidate
 		}
-
-		// Try matching by base name (e.g., "/data" matches root "D:\data")
 		if filepath.Base(root) == relPath {
 			return root
 		}
@@ -194,4 +187,14 @@ func (s *Session) findRootDir(absPath string) string {
 		}
 	}
 	return filepath.Dir(absPath)
+}
+
+// isEOF returns true if the error indicates a normal connection close.
+func isEOF(err error) bool {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return true
+	}
+	// Also catch wrapped EOF
+	s := err.Error()
+	return s == "EOF" || strings.Contains(s, "EOF")
 }

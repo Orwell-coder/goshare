@@ -2,7 +2,6 @@ package http
 
 import (
 	"html/template"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,11 +44,11 @@ tr:hover { background:rgba(233,69,96,0.05); }
 <body>
 <div class="header">
   <h1>GoSync</h1>
-  <div class="path">/{{.CurrentPath}}</div>
+  <div class="path">{{if .CurrentPath}}/{{.CurrentPath}}{{else}}根目录{{end}}</div>
 </div>
 <div class="toolbar">
   <a href="/">根目录</a>
-  {{if .Parent}}<a href="/browse/{{.Parent}}">⬆ 上级目录</a>{{end}}
+  {{if .ParentPath}}<a href="/browse/{{.ParentPath}}">⬆ 上级目录</a>{{end}}
   {{if .CurrentPath}}<a class="dl-btn" href="/download?path=/{{.CurrentPath}}">⬇ 下载此文件夹</a>{{end}}
 </div>
 <table>
@@ -60,7 +59,7 @@ tr:hover { background:rgba(233,69,96,0.05); }
   <tr>
     <td class="name {{if .IsDir}}dir{{end}}">
       {{if .IsDir}}
-        <a href="/browse/{{$.CurrentPath}}/{{.Name}}">📁 {{.Name}}/</a>
+        <a href="/browse/{{$.Breadcrumb}}/{{.Name}}">📁 {{.Name}}/</a>
       {{else}}
         📄 {{.Name}}
       {{end}}
@@ -69,7 +68,7 @@ tr:hover { background:rgba(233,69,96,0.05); }
     <td class="time">{{.ModTime}}</td>
     <td>
       {{if .IsDir}}
-        <a class="dl-btn" href="/download?path=/{{$.CurrentPath}}/{{.Name}}">下载</a>
+        <a class="dl-btn" href="/download?path=/{{$.Breadcrumb}}/{{.Name}}">下载</a>
       {{end}}
     </td>
   </tr>
@@ -92,20 +91,21 @@ type browseEntry struct {
 
 type browseData struct {
 	CurrentPath string
-	Parent      string
+	ParentPath  string
+	Breadcrumb  string
 	Entries     []browseEntry
 }
 
-// handleBrowse renders the directory listing for a given path under rootDirs.
+// handleBrowse renders directory listing for paths under configured root directories.
+// Path format: /browse/<rootName>/<subpath...>
 func handleBrowse(rootDirs []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		relPath := strings.TrimPrefix(r.URL.Path, "/browse/")
 		relPath = strings.TrimPrefix(relPath, "/browse")
+		relPath = strings.Trim(relPath, "/")
 
-		// Find which root contains this path
-		var targetDir string
-		if relPath == "" || relPath == "/" {
-			// Show available root directories
+		if relPath == "" {
+			// Root level: show all configured root directories
 			entries := make([]browseEntry, 0, len(rootDirs))
 			for _, rd := range rootDirs {
 				name := filepath.Base(rd)
@@ -114,24 +114,34 @@ func handleBrowse(rootDirs []string) http.HandlerFunc {
 					IsDir: true,
 				})
 			}
-			data := browseData{
+			browseTmpl.Execute(w, browseData{
 				CurrentPath: "",
+				Breadcrumb:  "",
 				Entries:     entries,
-			}
-			browseTmpl.Execute(w, data)
+			})
 			return
 		}
 
-		cleanPath := filepath.FromSlash(strings.TrimPrefix(relPath, "/"))
+		// Resolve path: first segment identifies the root directory by name
+		parts := strings.SplitN(relPath, "/", 2)
+		rootName := parts[0]
+		subPath := ""
+		if len(parts) > 1 {
+			subPath = parts[1]
+		}
+
+		// Find the root by name
+		var targetDir string
 		for _, root := range rootDirs {
-			candidate := filepath.Join(root, cleanPath)
-			if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-				targetDir = candidate
-				break
-			}
-			// Try as a root name
-			if filepath.Base(root) == cleanPath {
-				targetDir = root
+			if filepath.Base(root) == rootName {
+				if subPath == "" {
+					targetDir = root
+				} else {
+					candidate := filepath.Join(root, filepath.FromSlash(subPath))
+					if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+						targetDir = candidate
+					}
+				}
 				break
 			}
 		}
@@ -141,7 +151,7 @@ func handleBrowse(rootDirs []string) http.HandlerFunc {
 			return
 		}
 
-		// Read directory
+		// Read directory entries
 		ents, err := os.ReadDir(targetDir)
 		if err != nil {
 			http.Error(w, "无法读取目录", http.StatusInternalServerError)
@@ -165,21 +175,18 @@ func handleBrowse(rootDirs []string) http.HandlerFunc {
 			entries = append(entries, entry)
 		}
 
-		// Calculate parent path
-		parent := ""
-		if dir := filepath.Dir(relPath); dir != "." {
-			parent = filepath.ToSlash(dir)
-			if parent == "/" {
-				parent = ""
-			}
+		// Build parent path for navigation
+		parentPath := ""
+		if idx := strings.LastIndex(relPath, "/"); idx >= 0 {
+			parentPath = relPath[:idx]
 		}
 
-		data := browseData{
+		browseTmpl.Execute(w, browseData{
 			CurrentPath: relPath,
-			Parent:      parent,
+			ParentPath:  parentPath,
+			Breadcrumb:  relPath,
 			Entries:     entries,
-		}
-		browseTmpl.Execute(w, data)
+		})
 	}
 }
 
@@ -216,9 +223,4 @@ func itoa(n int64) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
-}
-
-func init() {
-	// Ensure embed compatibility if used
-	_ = fs.Stat
 }
