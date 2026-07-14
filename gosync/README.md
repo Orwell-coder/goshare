@@ -2,10 +2,11 @@
 
 高性能局域网文件同步下载工具，Go 语言编写，CS+BS 混合架构。
 
-浏览器 + 专用客户端双通道，零依赖单文件分发，适合 Windows 局域网环境下快速拉取大型文件夹。
+浏览器 + 专用客户端双通道，单二进制分发，适合 Windows 局域网环境下快速拉取大型文件夹。
 
 ## 特性
 
+- **单二进制** — 一个 `gosync.exe` 既是服务端也是客户端，零依赖分发
 - **双协议支持** — 浏览器 HTTP 访问 + 专用 TCP 客户端，兼顾便捷与性能
 - **流式压缩下载** — 浏览器端实时 streaming zip，不落临时文件，大文件夹无内存压力
 - **分块流式传输** — 所有文件统一 4MB 分块 + sync.Pool 缓冲区复用，支持超大文件夹（40GB+）
@@ -13,9 +14,28 @@
 - **目录递归遍历** — 自动保留完整目录结构及子文件
 - **并发传输** — 多文件并行下载，goroutine 信号量限流，可配置并发数
 - **终端进度条** — 实时显示传输速度、进度百分比、剩余时间
-- **单文件分发** — 一个 exe + 命令行参数即可运行，无需配置文件
 - **增量跳过** — 根据文件大小和修改时间自动跳过已存在且一致的文件（1 秒容差兼容 FAT/exFAT）
 - **崩溃可观测** — panic recovery + stack trace 日志，异常不再静默退出
+
+## 安装
+
+### 通过 go install
+
+```powershell
+go install github.com/zhengxu/gosync/cmd/gosync@latest
+```
+
+### 手动编译
+
+```powershell
+git clone https://github.com/zhengxu/gosync.git
+cd gosync
+.\build.ps1   # PowerShell
+# 或
+build.bat     # CMD
+```
+
+要求 Go 1.22+。
 
 ## 快速开始
 
@@ -25,10 +45,10 @@
 
 ```powershell
 # 指定目录
-.\gosync-server.exe --root D:\data --root E:\work
+gosync serve --root D:\data --root E:\work
 
 # 或使用当前目录（不指定 --root）
-.\gosync-server.exe
+gosync serve
 ```
 
 ```
@@ -50,14 +70,14 @@
 
 **浏览器方式：** 打开 `http://<服务器IP>:18080`，浏览目录，点击下载按钮。
 
-**客户端方式（推荐）：**
+**命令行方式（推荐）：**
 
 ```powershell
 # 查看远程目录
-.\gosync-client.exe list 192.168.1.100 /data
+gosync list 192.168.1.100 /data
 
 # 下载整个文件夹
-.\gosync-client.exe pull 192.168.1.100 /data --output D:\backup
+gosync pull 192.168.1.100 /data --output D:\backup
 ```
 
 ```
@@ -118,44 +138,53 @@ TCP 协议帧格式：
 
 ## 命令行参考
 
-### 服务端 `gosync-server.exe`
+### `gosync serve` — 启动服务端
 
-| 参数 | 短参数 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `--root` | `-r` | 当前目录 | 允许访问的根目录，可多次指定 |
-| `--http` | `-H` | `:18080` | HTTP 监听地址 |
-| `--tcp` | `-T` | `:19090` | TCP 监听地址 |
-| `--concurrency` | `-n` | `8` | 并行传输文件数 |
-| `--chunk-size` | `-k` | `4` | 分块大小 (MB) |
-| `--compress` | — | 默认启用 | 启用 zstd 压缩 |
-| `--no-compress` | — | — | 禁用 zstd 压缩 |
-| `--compress-level` | `-z` | `3` | zstd 压缩级别 (1=最快, 22=最优) |
-| `--rate-limit` | `-R` | `0` | 限速 (MB/s)，0=不限速 |
-| `--help` | `-h` | — | 显示帮助 |
+| 参数                 | 短参数 | 默认值     | 说明                            |
+| -------------------- | ------ | ---------- | ------------------------------- |
+| `--root`           | `-r` | 当前目录   | 允许访问的根目录，可多次指定    |
+| `--http`           | `-H` | `:18080` | HTTP 监听地址                   |
+| `--tcp`            | `-T` | `:19090` | TCP 监听地址                    |
+| `--concurrency`    | `-n` | `8`      | 并行传输文件数                  |
+| `--chunk-size`     | `-k` | `4`      | 分块大小 (MB)                   |
+| `--compress`       | —     | 默认启用   | 启用 zstd 压缩                  |
+| `--no-compress`    | —     | —         | 禁用 zstd 压缩                  |
+| `--compress-level` | `-z` | `3`      | zstd 压缩级别 (1=最快, 22=最优) |
+| `--rate-limit`     | `-R` | `0`      | 限速 (MB/s)，0=不限速           |
+| `--help`           | `-h` | —         | 显示帮助                        |
 
-### 客户端 `gosync-client.exe`
+### `gosync pull` — 下载文件夹
 
 ```powershell
-gosync-client pull <主机IP> <远程路径> [flags]
-gosync-client list <主机IP> <远程路径> [flags]
+gosync pull <主机IP> <远程路径> [flags]
 ```
 
-| 参数 | 短参数 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `--output` | `-o` | 远程路径名 | 本地输出目录（默认取远程路径最后一段） |
-| `--port` | `-p` | `19090` | TCP 端口 |
-| `--concurrency` | `-c` | `8` | 并行下载数 |
+| 参数              | 短参数 | 默认值     | 说明                                   |
+| ----------------- | ------ | ---------- | -------------------------------------- |
+| `--output`      | `-o` | 远程路径名 | 本地输出目录（默认取远程路径最后一段） |
+| `--port`        | `-p` | `19090`  | TCP 端口                               |
+| `--concurrency` | `-c` | `8`      | 并行下载数                             |
+
+### `gosync list` — 列出远程目录
+
+```powershell
+gosync list <主机IP> <远程路径> [flags]
+```
+
+| 参数         | 短参数 | 默认值    | 说明     |
+| ------------ | ------ | --------- | -------- |
+| `--port`   | `-p` | `19090` | TCP 端口 |
 
 ## 性能策略
 
-| 策略 | 说明 |
-| --- | --- |
+| 策略         | 说明                                                                  |
+| ------------ | --------------------------------------------------------------------- |
 | 统一分块流式 | 所有文件统一 4MB 分块读取，不按大小区分路径，`sync.Pool` 复用缓冲区 |
-| 并发控制 | goroutine 信号量限流，默认 8 路并发 |
-| zstd 压缩 | level 3，自动跳过 .zip/.jpg/.jpeg/.png/.mp4/.mkv/.avi 等已压缩格式 |
-| 连接复用 | TCP 长连接，多文件复用同一连接 |
-| TCP 调优 | TCP_NODELAY + 1MB Read/Write Buffer |
-| Panic 防护 | HTTP handler + TCP session 双重 panic recovery，异常带 stack trace |
+| 并发控制     | goroutine 信号量限流，默认 8 路并发                                   |
+| zstd 压缩    | level 3，自动跳过 .zip/.jpg/.jpeg/.png/.mp4/.mkv/.avi 等已压缩格式    |
+| 连接复用     | TCP 长连接，多文件复用同一连接                                        |
+| TCP 调优     | TCP_NODELAY + 1MB Read/Write Buffer                                   |
+| Panic 防护   | HTTP handler + TCP session 双重 panic recovery，异常带 stack trace    |
 
 ## 增量下载
 
@@ -165,30 +194,6 @@ gosync-client list <主机IP> <远程路径> [flags]
 - **不一致或不存在** → 下载
 
 如需强制全量覆盖，删除本地目标目录后重新下载即可。
-
-## 编译
-
-**快捷脚本：**
-
-```powershell
-.\build.ps1   # PowerShell
-build.bat     # CMD
-```
-
-**手动编译：**
-
-```powershell
-# 安装依赖
-go mod tidy
-
-# 编译服务端
-go build -ldflags="-s -w" -o gosync-server.exe ./cmd/server/
-
-# 编译客户端
-go build -ldflags="-s -w" -o gosync-client.exe ./cmd/client/
-```
-
-脚本会先运行 `go vet` 检查代码，然后编译两个 exe（`-ldflags="-s -w"` 去除调试信息精简体积），并显示文件大小。要求 Go 1.22+。
 
 ## 技术栈
 

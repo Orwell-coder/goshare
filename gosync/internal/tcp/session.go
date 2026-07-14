@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gosync/internal/filesvc"
-	"gosync/internal/proto"
-	"gosync/internal/transfer"
+	"github.com/zhengxu/gosync/internal/filesvc"
+	"github.com/zhengxu/gosync/internal/proto"
+	"github.com/zhengxu/gosync/internal/transfer"
 )
 
 // Session handles a single client TCP connection.

@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"gosync/internal/proto"
+	"github.com/zhengxu/gosync/internal/proto"
 )
 
 // Conn wraps a TCP connection to the GoSync server with message encoding.

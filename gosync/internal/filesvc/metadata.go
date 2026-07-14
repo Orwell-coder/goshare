@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"gosync/internal/proto"
+	"github.com/zhengxu/gosync/internal/proto"
 )
 
 // FileInfo extends proto.FileInfo with local filesystem helpers.

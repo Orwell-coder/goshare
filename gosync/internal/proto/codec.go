@@ -32,7 +32,7 @@ type Decoder struct {
 
 // NewCodec creates an Encoder/Decoder pair for a connection.
 func NewEncoder(conn net.Conn) *Encoder {
-	w := bufio.NewWriterSize(conn, 1024*1024) // 1MB write buffer
+	w := bufio.NewWriterSize(conn, 8*1024*1024) // 8MB: fits two 4MB chunks + headers without intermediate flush
 	return &Encoder{
 		w:   w,
 		enc: gob.NewEncoder(w),
@@ -74,36 +74,35 @@ func (e *Encoder) Encode(msg interface{}) error {
 }
 
 // WriteChunk sends a file data chunk using raw binary encoding.
-// Format: [pathLen:2B][path][offset:8B][dataLen:4B][data][isLast:1B]
+// Format: [type:1B][pathLen:2B][path:N][offset:8B][dataLen:4B][data:N][isLast:1B]
+// Does NOT flush — BatchDone.Encode() handles that, reducing syscalls per chunk from ~5 to ~0.
 func (e *Encoder) WriteChunk(path string, offset int64, data []byte, isLast bool) error {
 	if err := e.w.WriteByte(byte(TypeDataChunk)); err != nil {
 		return err
 	}
-	if err := binary.Write(e.w, binary.BigEndian, uint16(len(path))); err != nil {
+
+	// Hand-rolled binary encoding avoids encoding/binary reflection overhead.
+	var hdr [14]byte
+	binary.BigEndian.PutUint16(hdr[0:2], uint16(len(path)))
+	binary.BigEndian.PutUint64(hdr[2:10], uint64(offset))
+	binary.BigEndian.PutUint32(hdr[10:14], uint32(len(data)))
+
+	if _, err := e.w.Write(hdr[0:2]); err != nil {
 		return err
 	}
 	if _, err := e.w.WriteString(path); err != nil {
 		return err
 	}
-	if err := binary.Write(e.w, binary.BigEndian, offset); err != nil {
-		return err
-	}
-	if err := binary.Write(e.w, binary.BigEndian, uint32(len(data))); err != nil {
+	if _, err := e.w.Write(hdr[2:14]); err != nil {
 		return err
 	}
 	if _, err := e.w.Write(data); err != nil {
 		return err
 	}
 	if isLast {
-		if err := e.w.WriteByte(1); err != nil {
-			return err
-		}
-	} else {
-		if err := e.w.WriteByte(0); err != nil {
-			return err
-		}
+		return e.w.WriteByte(1)
 	}
-	return e.w.Flush()
+	return e.w.WriteByte(0)
 }
 
 // Decode reads and returns the next message from the stream.

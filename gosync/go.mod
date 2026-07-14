@@ -1,4 +1,4 @@
-module gosync
+module github.com/zhengxu/gosync
 
 go 1.24
 

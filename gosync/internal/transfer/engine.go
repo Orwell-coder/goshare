@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"gosync/internal/filesvc"
-	"gosync/internal/proto"
+	"github.com/zhengxu/gosync/internal/filesvc"
+	"github.com/zhengxu/gosync/internal/proto"
 )
 
 // Config holds transfer engine configuration.
