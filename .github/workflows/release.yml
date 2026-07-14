@@ -122,3 +122,8 @@ jobs:
             goshare.exe.sha256
             winget_out/Orwell-coder.goshare.yaml
           generate_release_notes: true
+
+  winget:
+    needs: release
+    uses: ./.github/workflows/winget.yml
+    secrets: inherit
