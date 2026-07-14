@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Go mod tidy
+        run: go mod tidy
+
+      - name: Cross-compile (Windows amd64)
+        run: GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
+
+      - name: Verify binary
+        run: |
+          if [ ! -f goshare.exe ]; then
+            echo "ERROR: goshare.exe not found after build"
+            exit 1
+          fi
+          SIZE=$(du -h goshare.exe | cut -f1)
+          echo "goshare.exe built: ${SIZE}"
+
+      - name: Download UPX
+        run: |
+          UPX_VERSION="4.2.4"
+          URL="https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz"
+          curl -sSL "$URL" -o upx.tar.xz
+          tar -xf upx.tar.xz
+          UPX_DIR=$(find . -maxdepth 1 -type d -name "upx-*" | head -1)
+          cp "${UPX_DIR}/upx" ./
+          chmod +x upx
+          echo "UPX ${UPX_VERSION} ready"
+
+      - name: UPX Compress
+        run: |
+          BEFORE=$(du -h goshare.exe | cut -f1)
+          ./upx --best --lzma goshare.exe || echo "WARNING: UPX failed, using uncompressed binary"
+          AFTER=$(du -h goshare.exe | cut -f1)
+          echo "UPX: ${BEFORE} → ${AFTER}"
+
+      - name: Generate checksum
+        run: |
+          sha256sum goshare.exe > goshare.exe.sha256
+          cat goshare.exe.sha256
+
+      - name: Generate winget manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          URL="https://github.com/Orwell-coder/goshare/releases/download/${GITHUB_REF_NAME}/goshare.exe"
+          SHA256=$(cut -d' ' -f1 goshare.exe.sha256)
+          RELEASE_DATE=$(date +%Y-%m-%d)
+
+          mkdir -p winget_out
+
+          cat > winget_out/Orwell-coder.goshare.yaml << EOF
+          PackageIdentifier: Orwell-coder.goshare
+          PackageVersion: ${VERSION}
+          PackageLocale: en-US
+          Publisher: Orwell-coder
+          PublisherUrl: https://github.com/Orwell-coder/goshare
+          PackageName: GoShare
+          PackageUrl: https://github.com/Orwell-coder/goshare
+          License: MIT
+          ShortDescription: High-performance LAN file sharing tool
+          Description: GoShare is a single-binary file sharing tool for LAN environments. Provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
+          Tags:
+            - file-sharing
+            - lan
+            - cli
+            - go
+          ReleaseDate: ${RELEASE_DATE}
+          Installers:
+            - Architecture: x64
+              InstallerType: portable
+              InstallerUrl: ${URL}
+              InstallerSha256: ${SHA256}
+          ManifestType: singleton
+          ManifestVersion: 1.6.0
+          EOF
+
+          echo "Winget manifest generated:"
+          cat winget_out/Orwell-coder.goshare.yaml
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "GoShare ${{ github.ref_name }}"
+          body: |
+            ## GoShare ${{ github.ref_name }}
+
+            高性能局域网文件分享工具 — 单二进制，CS+BS 混合架构。
+
+            ### 安装
+
+            ```powershell
+            # winget
+            winget install Orwell-coder.goshare
+
+            # 直接下载
+            Invoke-WebRequest -Uri "https://github.com/Orwell-coder/goshare/releases/download/${{ github.ref_name }}/goshare.exe" -OutFile goshare.exe
+
+            # go install
+            go install github.com/Orwell-coder/goshare/cmd/goshare@${{ github.ref_name }}
+            ```
+          files: |
+            goshare.exe
+            goshare.exe.sha256
+            winget_out/Orwell-coder.goshare.yaml
+          generate_release_notes: true

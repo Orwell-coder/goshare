@@ -3,6 +3,7 @@
 ## 自动生成
 
 每次推送 `v*` 标签时，Release 工作流会自动：
+
 1. 编译 + UPX 压缩 `goshare.exe`
 2. 生成 winget manifest (`Orwell-coder.goshare.yaml`)
 3. 随 GitHub Release 一起发布

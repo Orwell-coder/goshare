@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,11 +21,5 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: go build
-        run: go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: goshare-windows-amd64
-          path: goshare.exe
+      - name: Cross-compile (Windows amd64)
+        run: GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
