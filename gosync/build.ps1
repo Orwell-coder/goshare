@@ -19,13 +19,22 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  ✓ 通过" -ForegroundColor Green
 
 # 编译
-Write-Host "[2/2] 编译 gosync.exe ..." -ForegroundColor Yellow
+Write-Host "[2/3] 编译 gosync.exe ..." -ForegroundColor Yellow
 go build -ldflags "-s -w" -o gosync.exe ./cmd/gosync/
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ 编译失败" -ForegroundColor Red
     exit 1
 }
-Write-Host "  ✓ gosync.exe" -ForegroundColor Green
+$beforeSize = [math]::Round((Get-Item gosync.exe).Length / 1MB, 1)
+Write-Host "  ✓ gosync.exe  ${beforeSize} MB" -ForegroundColor Green
+
+# UPX 压缩
+Write-Host "[3/3] UPX 压缩 ..." -ForegroundColor Yellow
+upx --best --lzma gosync.exe
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✗ UPX 压缩失败" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -33,8 +42,9 @@ Write-Host "  构建完成" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$size = [math]::Round((Get-Item gosync.exe).Length / 1MB, 1)
-Write-Host "  gosync.exe  ${size} MB"
+$afterSize = [math]::Round((Get-Item gosync.exe).Length / 1MB, 1)
+$ratio = [math]::Round(($beforeSize - $afterSize) / $beforeSize * 100, 0)
+Write-Host "  压缩前: ${beforeSize} MB  →  压缩后: ${afterSize} MB  (${ratio}%)"
 Write-Host ""
 Write-Host "  启动服务:  .\gosync.exe serve --root <目录>"
 Write-Host "  下载文件:  .\gosync.exe pull <ip> <path>"
