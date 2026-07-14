@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/zhengxu/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/proto"
 )
 
 // DefaultChunkSize is the default size of data chunks sent over TCP (4MB).

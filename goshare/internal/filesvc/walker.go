@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/zhengxu/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/proto"
 )
 
 // Walk recursively walks a directory tree and returns all FileInfo entries sorted by path.

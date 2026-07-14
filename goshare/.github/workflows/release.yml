@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Build
+        run: go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
+
+      - name: Download UPX
+        shell: pwsh
+        run: |
+          $upxVersion = "4.2.4"
+          $url = "https://github.com/upx/upx/releases/download/v${upxVersion}/upx-${upxVersion}-win64.zip"
+          Invoke-WebRequest -Uri $url -OutFile upx.zip
+          Expand-Archive upx.zip -DestinationPath .
+          $upxDir = Get-ChildItem -Directory -Filter "upx-*" | Select-Object -First 1
+          Copy-Item "$($upxDir.Name)\upx.exe" . -Force
+
+      - name: UPX Compress
+        run: ./upx --best --lzma goshare.exe
+
+      - name: Generate checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 goshare.exe).Hash.ToLower()
+          "$hash  goshare.exe" | Out-File -Encoding ascii goshare.exe.sha256
+
+      - name: Generate winget manifest
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $url = "https://github.com/Orwell-coder/goshare/releases/download/${{ github.ref_name }}/goshare.exe"
+          $sha256 = (Get-FileHash -Algorithm SHA256 goshare.exe).Hash.ToLower()
+
+          New-Item -ItemType Directory -Force -Path winget_out | Out-Null
+
+          @"
+          PackageIdentifier: Orwell-coder.goshare
+          PackageVersion: $version
+          PackageLocale: en-US
+          Publisher: Orwell-coder
+          PublisherUrl: https://github.com/Orwell-coder/goshare
+          PackageName: GoShare
+          PackageUrl: https://github.com/Orwell-coder/goshare
+          License: MIT
+          ShortDescription: High-performance LAN file sharing tool
+          Description: GoShare is a single-binary file sharing tool for LAN environments. It provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
+          Tags:
+            - file-sharing
+            - lan
+            - cli
+            - go
+          ReleaseDate: $(Get-Date -Format "yyyy-MM-dd")
+          Installers:
+            - Architecture: x64
+              InstallerType: portable
+              InstallerUrl: $url
+              InstallerSha256: $sha256
+          ManifestType: singleton
+          ManifestVersion: 1.6.0
+          "@ | Out-File -Encoding utf8 winget_out/Orwell-coder.goshare.yaml
+
+          Write-Host "Winget manifest written to winget_out/Orwell-coder.goshare.yaml"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "GoShare ${{ github.ref_name }}"
+          body: |
+            ## GoShare ${{ github.ref_name }}
+
+            高性能局域网文件分享工具。
+
+            ### 安装
+
+            ```powershell
+            # 直接下载
+            Invoke-WebRequest -Uri "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/goshare.exe" -OutFile goshare.exe
+            ```
+
+            ### 校验
+
+            见 `goshare.exe.sha256`。
+          files: |
+            goshare.exe
+            goshare.exe.sha256
+            winget_out/Orwell-coder.goshare.yaml
+          generate_release_notes: true

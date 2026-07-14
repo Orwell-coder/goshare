@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zhengxu/goshare/internal/http"
-	"github.com/zhengxu/goshare/internal/tcp"
-	"github.com/zhengxu/goshare/internal/transfer"
-	"github.com/zhengxu/goshare/pkg/client"
+	"github.com/Orwell-coder/goshare/internal/http"
+	"github.com/Orwell-coder/goshare/internal/tcp"
+	"github.com/Orwell-coder/goshare/internal/transfer"
+	"github.com/Orwell-coder/goshare/pkg/client"
 )
 
 func main() {

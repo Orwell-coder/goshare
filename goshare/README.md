@@ -19,16 +19,26 @@
 
 ## 安装
 
+### 通过 winget（推荐）
+
+```powershell
+winget install Orwell-coder.goshare
+```
+
+### 从 GitHub Release 下载
+
+从 [Releases](https://github.com/Orwell-coder/goshare/releases) 页面下载最新的 `goshare.exe`。
+
 ### 通过 go install
 
 ```powershell
-go install github.com/zhengxu/goshare/cmd/goshare@latest
+go install github.com/Orwell-coder/goshare/cmd/goshare@latest
 ```
 
 ### 手动编译
 
 ```powershell
-git clone https://github.com/zhengxu/goshare.git
+git clone https://github.com/Orwell-coder/goshare.git
 cd goshare
 .\build.ps1   # PowerShell
 # 或

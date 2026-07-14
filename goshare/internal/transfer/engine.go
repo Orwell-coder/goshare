@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zhengxu/goshare/internal/filesvc"
-	"github.com/zhengxu/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/filesvc"
+	"github.com/Orwell-coder/goshare/internal/proto"
 )
 
 // Config holds transfer engine configuration.

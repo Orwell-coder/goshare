@@ -32,7 +32,7 @@ There are no tests in this project.
 
 ## Architecture
 
-Single-binary Go application (`goshare.exe`) — same binary is both server and client. Module path: `github.com/zhengxu/goshare` (Go 1.24+, single dependency: `klauspost/compress` for zstd).
+Single-binary Go application (`goshare.exe`) — same binary is both server and client. Module path: `github.com/Orwell-coder/goshare` (Go 1.24+, single dependency: `klauspost/compress` for zstd).
 
 ### Dual protocol design
 

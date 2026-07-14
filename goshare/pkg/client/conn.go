@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/zhengxu/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/proto"
 )
 
 // Conn wraps a TCP connection to the GoShare server with message encoding.

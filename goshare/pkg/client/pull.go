@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zhengxu/goshare/internal/filesvc"
-	"github.com/zhengxu/goshare/internal/proto"
-	"github.com/zhengxu/goshare/internal/transfer"
+	"github.com/Orwell-coder/goshare/internal/filesvc"
+	"github.com/Orwell-coder/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/transfer"
 )
 
 // PullOptions configures a pull (download) operation.

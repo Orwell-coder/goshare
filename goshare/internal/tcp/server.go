@@ -7,8 +7,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/zhengxu/goshare/internal/proto"
-	"github.com/zhengxu/goshare/internal/transfer"
+	"github.com/Orwell-coder/goshare/internal/proto"
+	"github.com/Orwell-coder/goshare/internal/transfer"
 )
 
 // Server handles TCP client connections for high-speed file transfer.

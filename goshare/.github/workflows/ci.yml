@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goshare-windows-amd64
+          path: goshare.exe

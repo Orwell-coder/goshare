@@ -1,4 +1,4 @@
-module github.com/zhengxu/goshare
+module github.com/Orwell-coder/goshare
 
 go 1.24
 
