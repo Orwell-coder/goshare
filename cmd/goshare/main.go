@@ -148,12 +148,12 @@ func main() {
 // ── serve config & run ───────────────────────────────────────────────
 
 type serveConfig struct {
-	httpAddr, tcpAddr       string
-	rootDirs                []string
+	httpAddr, tcpAddr                       string
+	rootDirs                                []string
 	concurrency, chunkSizeMB, largeThreshMB int
-	compress                bool
-	compressLevel           int
-	rateLimitMBs            int
+	compress                                bool
+	compressLevel                           int
+	rateLimitMBs                            int
 }
 
 func runServe(cfg serveConfig) {
@@ -238,6 +238,7 @@ func printUsage() {
 	fmt.Println("  help     显示帮助")
 	fmt.Println()
 	fmt.Println("示例:")
+	fmt.Println("  goshare serve")
 	fmt.Println("  goshare serve --root D:\\share")
 	fmt.Println("  goshare pull 192.168.1.100 /data/movies --output D:\\downloads")
 	fmt.Println("  goshare list 192.168.1.100 /data")
