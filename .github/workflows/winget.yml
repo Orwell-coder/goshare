@@ -1,0 +1,16 @@
+name: Publish to WinGet
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  winget:
+    runs-on: windows-latest
+    steps:
+      - name: Submit to WinGet Community Repository
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: Orwell-coder.goshare
+          installers-regex: '\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
