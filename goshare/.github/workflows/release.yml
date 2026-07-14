@@ -20,8 +20,21 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: Go mod tidy
+        run: go mod tidy
+
       - name: Build
         run: go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
+
+      - name: Verify binary
+        shell: pwsh
+        run: |
+          if (-not (Test-Path goshare.exe)) {
+            Write-Error "goshare.exe not found after build"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item goshare.exe).Length / 1MB, 1)
+          Write-Host "goshare.exe built: ${size} MB"
 
       - name: Download UPX
         shell: pwsh
@@ -31,16 +44,31 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile upx.zip
           Expand-Archive upx.zip -DestinationPath .
           $upxDir = Get-ChildItem -Directory -Filter "upx-*" | Select-Object -First 1
+          if (-not $upxDir) {
+            Write-Error "Failed to extract UPX"
+            exit 1
+          }
           Copy-Item "$($upxDir.Name)\upx.exe" . -Force
+          Write-Host "UPX $upxVersion ready"
 
       - name: UPX Compress
-        run: ./upx --best --lzma goshare.exe
+        shell: pwsh
+        run: |
+          $beforeSize = [math]::Round((Get-Item goshare.exe).Length / 1MB, 1)
+          .\upx.exe --best --lzma goshare.exe
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "UPX failed, using uncompressed binary"
+          } else {
+            $afterSize = [math]::Round((Get-Item goshare.exe).Length / 1MB, 1)
+            Write-Host "UPX compressed: ${beforeSize} MB -> ${afterSize} MB"
+          }
 
       - name: Generate checksum
         shell: pwsh
         run: |
           $hash = (Get-FileHash -Algorithm SHA256 goshare.exe).Hash.ToLower()
           "$hash  goshare.exe" | Out-File -Encoding ascii goshare.exe.sha256
+          Write-Host "SHA256: $hash"
 
       - name: Generate winget manifest
         shell: pwsh
@@ -61,7 +89,7 @@ jobs:
           PackageUrl: https://github.com/Orwell-coder/goshare
           License: MIT
           ShortDescription: High-performance LAN file sharing tool
-          Description: GoShare is a single-binary file sharing tool for LAN environments. It provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
+          Description: GoShare is a single-binary file sharing tool for LAN environments. Provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
           Tags:
             - file-sharing
             - lan
@@ -77,7 +105,7 @@ jobs:
           ManifestVersion: 1.6.0
           "@ | Out-File -Encoding utf8 winget_out/Orwell-coder.goshare.yaml
 
-          Write-Host "Winget manifest written to winget_out/Orwell-coder.goshare.yaml"
+          Write-Host "Winget manifest generated"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -86,18 +114,26 @@ jobs:
           body: |
             ## GoShare ${{ github.ref_name }}
 
-            高性能局域网文件分享工具。
+            高性能局域网文件分享工具 — 单二进制，CS+BS 混合架构。
 
             ### 安装
 
             ```powershell
+            # winget（提交 winget-pkgs 后可用）
+            winget install Orwell-coder.goshare
+
             # 直接下载
-            Invoke-WebRequest -Uri "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ github.ref_name }}/goshare.exe" -OutFile goshare.exe
+            Invoke-WebRequest -Uri "https://github.com/Orwell-coder/goshare/releases/download/${{ github.ref_name }}/goshare.exe" -OutFile goshare.exe
+
+            # go install
+            go install github.com/Orwell-coder/goshare/cmd/goshare@${{ github.ref_name }}
             ```
 
             ### 校验
 
-            见 `goshare.exe.sha256`。
+            ```
+            $(Get-Content goshare.exe.sha256)
+            ```
           files: |
             goshare.exe
             goshare.exe.sha256
