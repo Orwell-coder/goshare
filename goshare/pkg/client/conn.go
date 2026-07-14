@@ -5,10 +5,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/zhengxu/gosync/internal/proto"
+	"github.com/zhengxu/goshare/internal/proto"
 )
 
-// Conn wraps a TCP connection to the GoSync server with message encoding.
+// Conn wraps a TCP connection to the GoShare server with message encoding.
 type Conn struct {
 	conn net.Conn
 	enc  *proto.Encoder

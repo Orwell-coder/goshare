@@ -13,7 +13,7 @@ var browseTmpl = template.Must(template.New("browse").Parse(`<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GoSync{{if .CurrentPath}} — {{.CurrentPath}}{{end}}</title>
+<title>GoShare{{if .CurrentPath}} — {{.CurrentPath}}{{end}}</title>
 <style>
 /* === Reset & Base === */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -132,8 +132,8 @@ tbody tr:hover td{background:#f9fafb}
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
       </div>
       <div class="header-text">
-        <h1>GoSync</h1>
-        <p class="sub">局域网文件同步</p>
+        <h1>GoShare</h1>
+        <p class="sub">局域网文件分享</p>
       </div>
     </div>
     {{if not .IsRoot}}{{if .Breadcrumbs}}
@@ -222,7 +222,7 @@ tbody tr:hover td{background:#f9fafb}
   </div>
 
   <!-- Footer -->
-  <div class="footer">GoSync v0.1 · 仅局域网使用</div>
+  <div class="footer">GoShare v0.1 · 仅局域网使用</div>
 
 </div>
 </body>

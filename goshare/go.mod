@@ -1,4 +1,4 @@
-module github.com/zhengxu/gosync
+module github.com/zhengxu/goshare
 
 go 1.24
 

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zhengxu/gosync/internal/http"
-	"github.com/zhengxu/gosync/internal/tcp"
-	"github.com/zhengxu/gosync/internal/transfer"
-	"github.com/zhengxu/gosync/pkg/client"
+	"github.com/zhengxu/goshare/internal/http"
+	"github.com/zhengxu/goshare/internal/tcp"
+	"github.com/zhengxu/goshare/internal/transfer"
+	"github.com/zhengxu/goshare/pkg/client"
 )
 
 func main() {
@@ -101,11 +101,11 @@ func main() {
 		pullFlags.Parse(reorderArgs(os.Args[2:]))
 		args := pullFlags.Args()
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "用法: gosync pull <host> <remote-path> [flags]")
+			fmt.Fprintln(os.Stderr, "用法: goshare pull <host> <remote-path> [flags]")
 			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "示例:")
-			fmt.Fprintln(os.Stderr, `  gosync pull 192.168.1.100 /data/movies`)
-			fmt.Fprintln(os.Stderr, `  gosync pull 192.168.1.100 /data/movies --output D:\downloads`)
+			fmt.Fprintln(os.Stderr, `  goshare pull 192.168.1.100 /data/movies`)
+			fmt.Fprintln(os.Stderr, `  goshare pull 192.168.1.100 /data/movies --output D:\downloads`)
 			os.Exit(1)
 		}
 		output := pullOutput
@@ -126,10 +126,10 @@ func main() {
 		listFlags.Parse(reorderArgs(os.Args[2:]))
 		args := listFlags.Args()
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "用法: gosync list <host> <remote-path> [flags]")
+			fmt.Fprintln(os.Stderr, "用法: goshare list <host> <remote-path> [flags]")
 			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, "示例:")
-			fmt.Fprintln(os.Stderr, `  gosync list 192.168.1.100 /data`)
+			fmt.Fprintln(os.Stderr, `  goshare list 192.168.1.100 /data`)
 			os.Exit(1)
 		}
 		if err := client.ListRemote(args[0], listPort, args[1]); err != nil {
@@ -183,7 +183,7 @@ func runServe(cfg serveConfig) {
 	})
 
 	log.Println("========================================")
-	log.Println("  GoSync Server")
+	log.Println("  GoShare Server")
 	log.Println("========================================")
 	log.Printf("  HTTP:      http://%s", cfg.httpAddr)
 	log.Printf("  TCP:       tcp://%s", cfg.tcpAddr)
@@ -226,23 +226,23 @@ func runServe(cfg serveConfig) {
 // ── top-level usage ─────────────────────────────────────────────────
 
 func printUsage() {
-	fmt.Println("GoSync — 高性能局域网文件同步工具")
+	fmt.Println("GoShare — 高性能局域网文件分享工具")
 	fmt.Println()
 	fmt.Println("用法:")
-	fmt.Println("  gosync <command> [arguments]")
+	fmt.Println("  goshare <command> [arguments]")
 	fmt.Println()
 	fmt.Println("命令:")
-	fmt.Println("  serve    启动文件同步服务端")
+	fmt.Println("  serve    启动文件分享服务端")
 	fmt.Println("  pull     从服务器下载文件夹")
 	fmt.Println("  list     列出远程目录内容")
 	fmt.Println("  help     显示帮助")
 	fmt.Println()
 	fmt.Println("示例:")
-	fmt.Println("  gosync serve --root D:\\share")
-	fmt.Println("  gosync pull 192.168.1.100 /data/movies --output D:\\downloads")
-	fmt.Println("  gosync list 192.168.1.100 /data")
+	fmt.Println("  goshare serve --root D:\\share")
+	fmt.Println("  goshare pull 192.168.1.100 /data/movies --output D:\\downloads")
+	fmt.Println("  goshare list 192.168.1.100 /data")
 	fmt.Println()
-	fmt.Println("运行 'gosync <command> --help' 查看各命令详细用法。")
+	fmt.Println("运行 'goshare <command> --help' 查看各命令详细用法。")
 }
 
 // reorderArgs moves flags (and their values) before positional arguments

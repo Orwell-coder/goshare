@@ -1,12 +1,12 @@
-# GoSync
+# GoShare
 
-高性能局域网文件同步下载工具，Go 语言编写，CS+BS 混合架构。
+高性能局域网文件分享工具，Go 语言编写，CS+BS 混合架构。
 
 浏览器 + 专用客户端双通道，单二进制分发，适合 Windows 局域网环境下快速拉取大型文件夹。
 
 ## 特性
 
-- **单二进制** — 一个 `gosync.exe` 既是服务端也是客户端，零依赖分发
+- **单二进制** — 一个 `goshare.exe` 既是服务端也是客户端，零依赖分发
 - **双协议支持** — 浏览器 HTTP 访问 + 专用 TCP 客户端，兼顾便捷与性能
 - **流式压缩下载** — 浏览器端实时 streaming zip，不落临时文件，大文件夹无内存压力
 - **分块流式传输** — 所有文件统一 4MB 分块 + sync.Pool 缓冲区复用，支持超大文件夹（40GB+）
@@ -22,14 +22,14 @@
 ### 通过 go install
 
 ```powershell
-go install github.com/zhengxu/gosync/cmd/gosync@latest
+go install github.com/zhengxu/goshare/cmd/goshare@latest
 ```
 
 ### 手动编译
 
 ```powershell
-git clone https://github.com/zhengxu/gosync.git
-cd gosync
+git clone https://github.com/zhengxu/goshare.git
+cd goshare
 .\build.ps1   # PowerShell
 # 或
 build.bat     # CMD
@@ -45,16 +45,16 @@ build.bat     # CMD
 
 ```powershell
 # 指定目录
-gosync serve --root D:\data --root E:\work
+goshare serve --root D:\data --root E:\work
 
 # 或使用当前目录（不指定 --root）
-gosync serve
+goshare serve
 ```
 
 ```
 未指定 --root，默认使用当前目录: C:\Users\attem\share
 ========================================
-  GoSync Server
+  GoShare Server
 ========================================
   HTTP:      http://:18080
   TCP:       tcp://:19090
@@ -74,10 +74,10 @@ gosync serve
 
 ```powershell
 # 查看远程目录
-gosync list 192.168.1.100 /data
+goshare list 192.168.1.100 /data
 
 # 下载整个文件夹
-gosync pull 192.168.1.100 /data --output D:\backup
+goshare pull 192.168.1.100 /data --output D:\backup
 ```
 
 ```
@@ -107,7 +107,7 @@ LAN 局域网
   └────┬─────┘          └──────┬───────┘
        │ :18080                │ :19090
   ┌────┴───────────────────────┴───────┐
-  │          Go Sync Server            │
+  │          GoShare Server            │
   │  ┌──────────────────────────────┐  │
   │  │     File Service Layer       │  │
   │  │  (并发目录遍历/元数据/校验和)   │  │
@@ -138,27 +138,27 @@ TCP 协议帧格式：
 
 ## 命令行参考
 
-### `gosync serve` — 启动服务端
+### `goshare serve` — 启动服务端
 
-| 参数                 | 短参数 | 默认值     | 说明                            |
-| -------------------- | ------ | ---------- | ------------------------------- |
-| `--root`           | `-r` | 当前目录   | 允许访问的根目录（可多次指定）  |
-| `--http`           | `-H` | `:18080` | HTTP 监听地址                   |
-| `--tcp`            | `-T` | `:19090` | TCP 监听地址                    |
-| `--concurrency`    | `-n` | `8`      | 并行传输文件数                  |
-| `--chunk-size`     | `-k` | `4`      | 分块大小 (MB)                   |
-| `--large-threshold`| `-l` | `16`     | 大文件阈值 (MB)                 |
-| `--compress`       | —     | `true`   | 启用 zstd 压缩                  |
-| `--no-compress`    | —     | `false`  | 禁用 zstd 压缩                  |
-| `--compress-level` | `-z` | `3`      | zstd 压缩级别（1=最快, 22=最优）|
-| `--rate-limit`     | `-R` | `0`      | 限速 MB/s（0=不限）             |
+| 参数                  | 短参数 | 默认值     | 说明                             |
+| --------------------- | ------ | ---------- | -------------------------------- |
+| `--root`            | `-r` | 当前目录   | 允许访问的根目录（可多次指定）   |
+| `--http`            | `-H` | `:18080` | HTTP 监听地址                    |
+| `--tcp`             | `-T` | `:19090` | TCP 监听地址                     |
+| `--concurrency`     | `-n` | `8`      | 并行传输文件数                   |
+| `--chunk-size`      | `-k` | `4`      | 分块大小 (MB)                    |
+| `--large-threshold` | `-l` | `16`     | 大文件阈值 (MB)                  |
+| `--compress`        | —     | `true`   | 启用 zstd 压缩                   |
+| `--no-compress`     | —     | `false`  | 禁用 zstd 压缩                   |
+| `--compress-level`  | `-z` | `3`      | zstd 压缩级别（1=最快, 22=最优） |
+| `--rate-limit`      | `-R` | `0`      | 限速 MB/s（0=不限）              |
 
 所有命令均支持 `-h` / `--help` 查看自动生成的帮助。
 
-### `gosync pull` — 下载文件夹
+### `goshare pull` — 下载文件夹
 
 ```powershell
-gosync pull <主机IP> <远程路径> [flags]
+goshare pull <主机IP> <远程路径> [flags]
 ```
 
 | 参数              | 短参数 | 默认值     | 说明                                   |
@@ -167,15 +167,15 @@ gosync pull <主机IP> <远程路径> [flags]
 | `--port`        | `-p` | `19090`  | TCP 端口                               |
 | `--concurrency` | `-c` | `8`      | 并行下载数                             |
 
-### `gosync list` — 列出远程目录
+### `goshare list` — 列出远程目录
 
 ```powershell
-gosync list <主机IP> <远程路径> [flags]
+goshare list <主机IP> <远程路径> [flags]
 ```
 
-| 参数         | 短参数 | 默认值    | 说明     |
-| ------------ | ------ | --------- | -------- |
-| `--port`   | `-p` | `19090` | TCP 端口 |
+| 参数       | 短参数 | 默认值    | 说明     |
+| ---------- | ------ | --------- | -------- |
+| `--port` | `-p` | `19090` | TCP 端口 |
 
 ## 性能策略
 
