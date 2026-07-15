@@ -85,7 +85,8 @@ jobs:
           git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git" "$BRANCH"
 
           # Create PR against microsoft/winget-pkgs
-          BODY="Automated submission of GoShare v${VERSION}.%0A%0ARelease: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+          printf -v BODY 'Automated submission of GoShare v%s.\n\nRelease: https://github.com/%s/releases/tag/v%s' \
+            "${VERSION}" "${GITHUB_REPOSITORY}" "${VERSION}"
           GH_TOKEN="${TOKEN}" gh pr create \
             --repo microsoft/winget-pkgs \
             --head "${GITHUB_REPOSITORY_OWNER}:${BRANCH}" \
