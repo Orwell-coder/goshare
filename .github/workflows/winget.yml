@@ -20,7 +20,7 @@ jobs:
           
           # 安装包在 Release 中的命名匹配规则 (支持通配符)
           # 假设你的安装包叫 goshare_windows_amd64.exe 或 goshare_setup.msi
-          installer-match: 'goshare.exe' 
+          installer-match: '\.exe$' 
           
           # 软件的元数据配置
           installer-type: exe # 可选值: exe, msi, msix, zip 等
