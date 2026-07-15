@@ -47,9 +47,10 @@ jobs:
           BRANCH="goshare-${VERSION}"
           git checkout -b "$BRANCH" upstream/master
 
-          # Create manifest
+          # Create manifest (unquoted heredoc so bash expands variables)
+          RELEASE_DATE=$(date +%Y-%m-%d)
           mkdir -p "$MANIFEST_DIR"
-          cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml" << 'MANIFEST'
+          cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml" << MANIFEST
           PackageIdentifier: Orwell-coder.goshare
           PackageVersion: ${VERSION}
           PackageLocale: en-US
@@ -65,7 +66,7 @@ jobs:
             - lan
             - cli
             - go
-          ReleaseDate: $(date +%Y-%m-%d)
+          ReleaseDate: ${RELEASE_DATE}
           Installers:
             - Architecture: x64
               InstallerType: portable
@@ -74,11 +75,6 @@ jobs:
           ManifestType: singleton
           ManifestVersion: 1.6.0
           MANIFEST
-
-          # Substitute variables
-          sed -i "s|\${VERSION}|${VERSION}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
-          sed -i "s|\${INSTALLER_URL}|${INSTALLER_URL}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
-          sed -i "s|\${INSTALLER_SHA256}|${INSTALLER_SHA256}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
 
           git add "$MANIFEST_DIR"
           git commit -m "Add ${PUBLISHER}.${PACKAGE} v${VERSION}"
