@@ -11,6 +11,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      installer_url: ${{ steps.meta.outputs.installer_url }}
+      installer_sha256: ${{ steps.meta.outputs.installer_sha256 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -57,6 +61,15 @@ jobs:
         run: |
           sha256sum goshare.exe > goshare.exe.sha256
           cat goshare.exe.sha256
+
+      - name: Set winget metadata
+        id: meta
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "installer_url=https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/goshare.exe" >> "$GITHUB_OUTPUT"
+          SHA256=$(cut -d' ' -f1 goshare.exe.sha256)
+          echo "installer_sha256=${SHA256}" >> "$GITHUB_OUTPUT"
 
       - name: Generate winget manifest
         run: |
@@ -126,4 +139,8 @@ jobs:
   winget:
     needs: release
     uses: ./.github/workflows/winget.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+      installer_url: ${{ needs.release.outputs.installer_url }}
+      installer_sha256: ${{ needs.release.outputs.installer_sha256 }}
     secrets: inherit

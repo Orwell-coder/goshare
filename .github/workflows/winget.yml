@@ -2,18 +2,92 @@ name: Publish to WinGet
 
 on:
   workflow_call:
-  release:
-    types: [published]
+    inputs:
+      version:
+        required: true
+        type: string
+      installer_url:
+        required: true
+        type: string
+      installer_sha256:
+        required: true
+        type: string
 
 jobs:
   winget:
     name: Submit to WinGet
     runs-on: ubuntu-latest
     steps:
-      - name: Submit package to WinGet
-        uses: vedantmgoyal9/winget-releaser@v2
-        with:
-          identifier: Orwell-coder.goshare
-          token: ${{ secrets.WINGET_TOKEN }}
-          installers-regex: '\.exe$'
-          max-versions-to-keep: 5
+      - name: Submit manifest to winget-pkgs
+        env:
+          VERSION: ${{ inputs.version }}
+          INSTALLER_URL: ${{ inputs.installer_url }}
+          INSTALLER_SHA256: ${{ inputs.installer_sha256 }}
+          TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PUBLISHER="Orwell-coder"
+          PACKAGE="goshare"
+          FIRST_LETTER=$(echo "${PUBLISHER:0:1}" | tr '[:upper:]' '[:lower:]')
+          MANIFEST_DIR="manifests/${FIRST_LETTER}/${PUBLISHER}/${PACKAGE}/${VERSION}"
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Clone the user's fork of winget-pkgs
+          FORK_URL="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git"
+          git clone --depth 1 "$FORK_URL" winget-pkgs
+          cd winget-pkgs
+
+          # Add upstream to branch from latest master
+          git remote add upstream https://github.com/microsoft/winget-pkgs.git
+          git fetch upstream --depth 1
+
+          BRANCH="goshare-${VERSION}"
+          git checkout -b "$BRANCH" upstream/master
+
+          # Create manifest
+          mkdir -p "$MANIFEST_DIR"
+          cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml" << 'MANIFEST'
+          PackageIdentifier: Orwell-coder.goshare
+          PackageVersion: ${VERSION}
+          PackageLocale: en-US
+          Publisher: Orwell-coder
+          PublisherUrl: https://github.com/Orwell-coder/goshare
+          PackageName: GoShare
+          PackageUrl: https://github.com/Orwell-coder/goshare
+          License: MIT
+          ShortDescription: High-performance LAN file sharing tool
+          Description: GoShare is a single-binary file sharing tool for LAN environments. Provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
+          Tags:
+            - file-sharing
+            - lan
+            - cli
+            - go
+          ReleaseDate: $(date +%Y-%m-%d)
+          Installers:
+            - Architecture: x64
+              InstallerType: portable
+              InstallerUrl: ${INSTALLER_URL}
+              InstallerSha256: ${INSTALLER_SHA256}
+          ManifestType: singleton
+          ManifestVersion: 1.6.0
+          MANIFEST
+
+          # Substitute variables
+          sed -i "s|\${VERSION}|${VERSION}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
+          sed -i "s|\${INSTALLER_URL}|${INSTALLER_URL}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
+          sed -i "s|\${INSTALLER_SHA256}|${INSTALLER_SHA256}|g" "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml"
+
+          git add "$MANIFEST_DIR"
+          git commit -m "Add ${PUBLISHER}.${PACKAGE} v${VERSION}"
+          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git" "$BRANCH"
+
+          # Create PR against microsoft/winget-pkgs
+          BODY="Automated submission of GoShare v${VERSION}.%0A%0ARelease: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
+          GH_TOKEN="${TOKEN}" gh pr create \
+            --repo microsoft/winget-pkgs \
+            --head "${GITHUB_REPOSITORY_OWNER}:${BRANCH}" \
+            --title "Add ${PUBLISHER}.${PACKAGE} v${VERSION}" \
+            --body "${BODY}"
