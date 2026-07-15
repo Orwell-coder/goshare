@@ -1,15 +1,32 @@
 name: Publish to WinGet
 
 on:
-  workflow_call:
+  release:
+    types: [published]
 
 jobs:
   winget:
-    runs-on: windows-latest
+    name: Submit to WinGet
+    runs-on: ubuntu-latest
     steps:
-      - name: Submit to WinGet Community Repository
-        uses: vedantmgoyal2009/winget-releaser@v2
+      - name: Submit package to WinGet
+        uses: wednesday-solutions/winget-releaser@v2
         with:
-          identifier: Orwell-coder.goshare
-          installers-regex: '\.exe$'
+          # 必须传入你在第二步配置的密钥
           token: ${{ secrets.WINGET_TOKEN }}
+          
+          # 你的 WinGet 包唯一标识符 (格式：开发者.软件名)
+          package-identifier: Orwell-coder.goshare
+          
+          # 安装包在 Release 中的命名匹配规则 (支持通配符)
+          # 假设你的安装包叫 goshare_windows_amd64.exe 或 goshare_setup.msi
+          installer-match: 'goshare.exe' 
+          
+          # 软件的元数据配置
+          installer-type: exe # 可选值: exe, msi, msix, zip 等
+          silent-install-args: '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' # 对应安装包的静默安装参数
+          
+          # 软件基本信息
+          project-url: https://github.com
+          license: MIT # 替换为你项目实际的开源协议
+          short-description: 'A brief description of goshare' # 软件的简短描述
