@@ -53,6 +53,11 @@ func (s *ChunkSender) SendFile(enc *proto.Encoder, fi *proto.FileInfo) (err erro
 		}
 	}()
 
+	// Empty file: send a single empty chunk so the client creates the file.
+	if fi.Size == 0 {
+		return enc.WriteChunk(fi.Path, 0, nil, true)
+	}
+
 	buf := chunkBufPool.Get().([]byte)
 	defer chunkBufPool.Put(buf)
 
