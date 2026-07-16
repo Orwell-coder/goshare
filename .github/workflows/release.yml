@@ -74,40 +74,69 @@ jobs:
       - name: Generate winget manifest
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          URL="https://github.com/Orwell-coder/goshare/releases/download/${GITHUB_REF_NAME}/goshare.exe"
+          PUBLISHER="Orwell-coder"
+          PACKAGE="goshare"
+          URL="https://github.com/${PUBLISHER}/${PACKAGE}/releases/download/${GITHUB_REF_NAME}/goshare.exe"
           SHA256=$(cut -d' ' -f1 goshare.exe.sha256)
           RELEASE_DATE=$(date +%Y-%m-%d)
 
           mkdir -p winget_out
 
-          cat > winget_out/Orwell-coder.goshare.yaml << EOF
-          PackageIdentifier: Orwell-coder.goshare
+          # Multi-file manifest (singleton is rejected by winget-pkgs).
+          # \$schema is escaped so it stays literal in the yaml-language-server comment.
+
+          # 1. Version manifest
+          cat > "winget_out/${PUBLISHER}.${PACKAGE}.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
+          PackageVersion: ${VERSION}
+          DefaultLocale: en-US
+          ManifestType: version
+          ManifestVersion: 1.12.0
+          EOF
+
+          # 2. Installer manifest
+          cat > "winget_out/${PUBLISHER}.${PACKAGE}.installer.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
+          PackageVersion: ${VERSION}
+          InstallerType: portable
+          Installers:
+          - Architecture: x64
+            InstallerUrl: ${URL}
+            InstallerSha256: ${SHA256}
+          ManifestType: installer
+          ManifestVersion: 1.12.0
+          ReleaseDate: ${RELEASE_DATE}
+          EOF
+
+          # 3. Default locale manifest
+          cat > "winget_out/${PUBLISHER}.${PACKAGE}.locale.en-US.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
           PackageVersion: ${VERSION}
           PackageLocale: en-US
-          Publisher: Orwell-coder
-          PublisherUrl: https://github.com/Orwell-coder/goshare
+          Publisher: ${PUBLISHER}
+          PublisherUrl: https://github.com/${PUBLISHER}/${PACKAGE}
           PackageName: GoShare
-          PackageUrl: https://github.com/Orwell-coder/goshare
+          PackageUrl: https://github.com/${PUBLISHER}/${PACKAGE}
           License: MIT
           ShortDescription: High-performance LAN file sharing tool
           Description: GoShare is a single-binary file sharing tool for LAN environments. Provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
           Tags:
-            - file-sharing
-            - lan
-            - cli
-            - go
-          ReleaseDate: ${RELEASE_DATE}
-          Installers:
-            - Architecture: x64
-              InstallerType: portable
-              InstallerUrl: ${URL}
-              InstallerSha256: ${SHA256}
-          ManifestType: singleton
-          ManifestVersion: 1.6.0
+          - file-sharing
+          - lan
+          - cli
+          - go
+          ManifestType: defaultLocale
+          ManifestVersion: 1.12.0
           EOF
 
-          echo "Winget manifest generated:"
-          cat winget_out/Orwell-coder.goshare.yaml
+          echo "Winget manifests generated:"
+          ls -1 winget_out/
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -134,6 +163,8 @@ jobs:
             goshare.exe
             goshare.exe.sha256
             winget_out/Orwell-coder.goshare.yaml
+            winget_out/Orwell-coder.goshare.installer.yaml
+            winget_out/Orwell-coder.goshare.locale.en-US.yaml
           generate_release_notes: true
 
   winget:

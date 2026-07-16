@@ -47,37 +47,64 @@ jobs:
           BRANCH="goshare-${VERSION}"
           git checkout -b "$BRANCH" upstream/master
 
-          # Create manifest (unquoted heredoc so bash expands variables)
+          # Create multi-file manifest (singleton is rejected by winget-pkgs).
+          # Unquoted heredocs so bash expands ${VERSION} etc.; \$schema is escaped
+          # so it stays literal in the yaml-language-server comment.
           RELEASE_DATE=$(date +%Y-%m-%d)
           mkdir -p "$MANIFEST_DIR"
+
+          # 1. Version manifest
           cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.yaml" << MANIFEST
-          PackageIdentifier: Orwell-coder.goshare
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
+          PackageVersion: ${VERSION}
+          DefaultLocale: en-US
+          ManifestType: version
+          ManifestVersion: 1.12.0
+          MANIFEST
+
+          # 2. Installer manifest
+          cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.installer.yaml" << MANIFEST
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
+          PackageVersion: ${VERSION}
+          InstallerType: portable
+          Installers:
+          - Architecture: x64
+            InstallerUrl: ${INSTALLER_URL}
+            InstallerSha256: ${INSTALLER_SHA256}
+          ManifestType: installer
+          ManifestVersion: 1.12.0
+          ReleaseDate: ${RELEASE_DATE}
+          MANIFEST
+
+          # 3. Default locale manifest
+          cat > "${MANIFEST_DIR}/${PUBLISHER}.${PACKAGE}.locale.en-US.yaml" << MANIFEST
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+          PackageIdentifier: ${PUBLISHER}.${PACKAGE}
           PackageVersion: ${VERSION}
           PackageLocale: en-US
-          Publisher: Orwell-coder
-          PublisherUrl: https://github.com/Orwell-coder/goshare
+          Publisher: ${PUBLISHER}
+          PublisherUrl: https://github.com/${PUBLISHER}/${PACKAGE}
           PackageName: GoShare
-          PackageUrl: https://github.com/Orwell-coder/goshare
+          PackageUrl: https://github.com/${PUBLISHER}/${PACKAGE}
           License: MIT
           ShortDescription: High-performance LAN file sharing tool
           Description: GoShare is a single-binary file sharing tool for LAN environments. Provides both a browser-based HTTP interface and a high-speed TCP CLI client for fast folder transfers.
           Tags:
-            - file-sharing
-            - lan
-            - cli
-            - go
-          ReleaseDate: ${RELEASE_DATE}
-          Installers:
-            - Architecture: x64
-              InstallerType: portable
-              InstallerUrl: ${INSTALLER_URL}
-              InstallerSha256: ${INSTALLER_SHA256}
-          ManifestType: singleton
-          ManifestVersion: 1.6.0
+          - file-sharing
+          - lan
+          - cli
+          - go
+          ManifestType: defaultLocale
+          ManifestVersion: 1.12.0
           MANIFEST
 
           git add "$MANIFEST_DIR"
-          git commit -m "Add ${PUBLISHER}.${PACKAGE} v${VERSION}"
+          git commit -m "${PUBLISHER}.${PACKAGE} version ${VERSION}"
           git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git" "$BRANCH"
 
           # Create PR against microsoft/winget-pkgs

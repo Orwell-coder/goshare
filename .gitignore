@@ -28,4 +28,6 @@ Thumbs.db
 upx/
 upx.zip
 
-
+.claude/plans
+winget_out_v0.3.1/
+fix-winget*.sh
