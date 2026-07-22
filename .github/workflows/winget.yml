@@ -105,7 +105,7 @@ jobs:
 
           git add "$MANIFEST_DIR"
           git commit -m "${PUBLISHER}.${PACKAGE} version ${VERSION}"
-          git push "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git" "$BRANCH"
+          git push --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/winget-pkgs.git" "$BRANCH"
 
           # Create PR against microsoft/winget-pkgs
           printf -v BODY 'Automated submission of GoShare v%s.\n\nRelease: https://github.com/%s/releases/tag/v%s' \
