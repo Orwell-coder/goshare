@@ -39,24 +39,6 @@ jobs:
           SIZE=$(du -h goshare.exe | cut -f1)
           echo "goshare.exe built: ${SIZE}"
 
-      - name: Download UPX
-        run: |
-          UPX_VERSION="4.2.4"
-          URL="https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-amd64_linux.tar.xz"
-          curl -sSL "$URL" -o upx.tar.xz
-          tar -xf upx.tar.xz
-          UPX_DIR=$(find . -maxdepth 1 -type d -name "upx-*" | head -1)
-          cp "${UPX_DIR}/upx" ./
-          chmod +x upx
-          echo "UPX ${UPX_VERSION} ready"
-
-      - name: UPX Compress
-        run: |
-          BEFORE=$(du -h goshare.exe | cut -f1)
-          ./upx --best --lzma goshare.exe || echo "WARNING: UPX failed, using uncompressed binary"
-          AFTER=$(du -h goshare.exe | cut -f1)
-          echo "UPX: ${BEFORE} → ${AFTER}"
-
       - name: Generate checksum
         run: |
           sha256sum goshare.exe > goshare.exe.sha256

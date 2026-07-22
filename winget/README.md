@@ -4,7 +4,7 @@
 
 每次推送 `v*` 标签时，Release 工作流会自动：
 
-1. 编译 + UPX 压缩 `goshare.exe`
+1. 编译 `goshare.exe`（不压缩）
 2. 生成 3 个 winget manifest 文件（多文件格式）：
    - `Orwell-coder.goshare.yaml`（version）
    - `Orwell-coder.goshare.installer.yaml`（installer）

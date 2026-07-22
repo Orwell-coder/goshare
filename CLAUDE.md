@@ -5,14 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```powershell
-# Windows build (PowerShell — runs go vet then go build)
+# Full build with UPX compression (PowerShell — local dev build with go vet + UPX)
 .\build.ps1
 
-# Windows build (CMD)
+# Full build with UPX compression (CMD — local dev build with UPX)
 build.bat
 
-# Build directly
+# Build directly without UPX (skips compression step)
 go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
+
+# Cross-compile Windows binary from Linux
+GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o goshare.exe ./cmd/goshare/
 
 # Vet
 go vet ./...
@@ -20,15 +23,22 @@ go vet ./...
 # Run server (current directory as root)
 .\goshare.exe serve
 
-# Run server with specific root
-.\goshare.exe serve --root D:\data
+# Run server with specific roots
+.\goshare.exe serve --root D:\data --root E:\work
 
 # Quick smoke test: pull from a running server
 .\goshare.exe list 127.0.0.1 /
 .\goshare.exe pull 127.0.0.1 /some-dir --output D:\test-out
 ```
 
-There are no tests in this project.
+There are no tests in this project. UPX is optional in the CI workflow (falls back to uncompressed binary if UPX fails).
+
+## Installation Options
+
+This project has multiple distribution channels:
+- **winget**: `winget install Orwell-coder.goshare` (automated via GitHub Actions)
+- **go install**: `go install github.com/Orwell-coder/goshare/cmd/goshare@latest`
+- **GitHub Releases**: Pre-compiled binaries with SHA256 checksums
 
 ## Architecture
 
@@ -58,7 +68,7 @@ Single-binary Go application (`goshare.exe`) — same binary is both server and 
 
 - **`internal/filesvc/`** — File system operations. `Walk()` for recursive directory listing (directories-first sort), `WalkShallow()` for single-level "list" command, `WalkConcurrent()` for SHA256 checksums. `Exists()` compares size + modtime with 1-second tolerance for FAT/exFAT compatibility.
 
-- **`pkg/client/`** — Client library. `Conn` wraps TCP connection with proto encoder/decoder. `Pull()` does: connect → list remote → diff against local files → download batches with progress bar. `Progress` uses Windows Console API (`GetConsoleScreenBufferInfo`) for terminal width detection.
+- **`pkg/client/`** — Client library. `Conn` wraps TCP connection with proto encoder/decoder. `Pull()` does: connect → list remote → diff against local files → download batches with progress bar. `Progress` uses Windows Console API (`GetConsoleScreenBufferInfo`) for terminal width detection, with a stub for non-Windows platforms returning 80 columns.
 
 ### Protocol flow
 
@@ -81,7 +91,47 @@ Client                          Server (TCP Session)
 - Incremental download: client diffs remote listing against local files by size + modtime (1s tolerance for FAT/exFAT), only downloads changed/missing files.
 - TCP 8MB write buffer allows two full chunks + headers to batch before a syscall flush.
 - Panic recovery on both HTTP handlers and TCP sessions with full stack trace logging.
+- Flag parsing supports interleaved flags and positional arguments via `reorderArgs()` (e.g., `pull 127.0.0.1 /data -c 4` works).
+
+### Serve flags
+
+| Flag                  | Short | Default   | Description |
+| --------------------- | ----- | --------- | ----------- |
+| `--http`            | `-H` | `:18080` | HTTP listen address |
+| `--tcp`             | `-T` | `:19090` | TCP listen address |
+| `--root`            | `-r` | cwd       | Root directories (repeatable) |
+| `--concurrency`     | `-n` | `8`      | Concurrent file transfers |
+| `--chunk-size`      | `-k` | `4`      | Chunk size in MB |
+| `--large-threshold` | `-l` | `16`     | Large file threshold in MB |
+| `--compress`        | —     | `true`   | Enable zstd compression |
+| `--no-compress`     | —     | `false`  | Disable zstd compression |
+| `--compress-level`  | `-z` | `3`      | zstd level (1=fastest, 22=best) |
+| `--rate-limit`      | `-R` | `0`      | Rate limit in MB/s (0=unlimited) |
+
+### Pull flags
+
+| Flag              | Short | Default     | Description |
+| ----------------- | ----- | ----------- | ----------- |
+| `--port`        | `-p` | `19090`    | TCP port |
+| `--output`      | `-o` | remote name | Local output directory |
+| `--concurrency` | `-c` | `8`        | Concurrent downloads |
+
+## CI/CD Workflows
+
+- **CI**: Runs `go vet` and cross-compiles on `ubuntu-latest` on push/pr to `main`/`master`
+- **Release**: Triggered on `v*` tags. Builds (uncompressed for AV compatibility), generates SHA256 checksums, creates multi-file winget manifests, and publishes a GitHub Release
+- **Winget**: Automated submission to `microsoft/winget-pkgs` via PR after release (requires `WINGET_TOKEN` secret)
 
 ## Platform
 
-Windows-only. The terminal progress bar uses `kernel32.dll` `GetConsoleScreenBufferInfo`. The `sendfile_windows.go` uses `io.CopyBuffer` rather than Windows `TransmitFile`. Porting to Linux/macOS would require a `sendfile_linux.go` (can use `syscall.Sendfile` for true zero-copy) and a `progress_linux.go` for terminal width detection.
+Windows-first with basic non-Windows support via build tags:
+- **Windows**: Terminal width detection via `kernel32.dll` `GetConsoleScreenBufferInfo`
+- **Linux/macOS**: Falls back to fixed 80-column width. Porting would require:
+  - `sendfile_linux.go` using `syscall.Sendfile` for zero-copy
+  - `term_linux.go` using `golang.org/x/term` for width detection
+
+## Limitations & Design Constraints
+
+- One-way download only (Server → Client), no upload or bidirectional sync
+- LAN-trusted environment, no authentication or encryption
+- Windows is the primary target; other platforms work but with reduced terminal UI

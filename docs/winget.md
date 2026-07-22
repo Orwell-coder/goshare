@@ -12,7 +12,7 @@ WinGet（Windows Package Manager）是微软官方的 Windows 包管理器。本
 推送 v* tag
     │
     ▼
-release.yml ─── 构建 -> 压缩 -> 创建 GitHub Release
+release.yml ─── 构建 -> 创建 GitHub Release
     │                │
     │          outputs: version, installer_url, installer_sha256
     │                │
@@ -90,8 +90,7 @@ git push origin v0.4.0
 | ------------------- | ------------------------------------------------------------------------------------- |
 | Checkout            | 拉取代码                                                                              |
 | Setup Go            | 安装 Go 1.24                                                                          |
-| Cross-compile       | 交叉编译`GOOS=windows GOARCH=amd64`，生成 `goshare.exe`                           |
-| UPX Compress        | 使用 UPX`--best --lzma` 压缩，减小 exe 体积                                         |
+| Cross-compile       | 交叉编译`GOOS=windows GOARCH=amd64`，生成 `goshare.exe`（不压缩，避免 AV 误报） |
 | Generate checksum   | 生成`sha256sum` 校验文件                                                            |
 | Set winget metadata | 提取 version、installer_url、installer_sha256，设为 job outputs                       |
 | Generate manifest   | 生成 3 个 winget manifest 文件，随 Release 附带                                        |
